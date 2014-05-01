@@ -1,0 +1,16 @@
+INPUT(
+./debug\main.o
+./debug\myglwidget.o
+./debug\mymainwindow.o
+./debug\glcamera.o
+./debug\vertex.o
+./debug\face.o
+./debug\halfedge.o
+./debug\mesh.o
+./debug\nearlyequal.o
+./debug\grid.o
+./debug\deformer.o
+./debug\qrc_shaders.o
+./debug\moc_myglwidget.o
+./debug\moc_mymainwindow.o
+);

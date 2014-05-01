@@ -1,0 +1,295 @@
+#include "mymainwindow.h"
+#include "ui_mymainwindow.h"
+#include "myglwidget.h"
+#include <set>
+
+using namespace std;
+
+MyMainWindow::MyMainWindow(QWidget *parent) :
+    QMainWindow(parent),
+    ui(new Ui::MyMainWindow)
+{   
+    ui->setupUi(this);
+    connect(ui->glwidget, SIGNAL(updateListSignal()), this, SLOT(updateListSlot()));
+    ui->glwidget->setFocus();
+    //ui->glwidget->redrawMesh();
+
+    ui->cameraViewComboBox->addItem("Perspective");
+    ui->cameraViewComboBox->addItem("Top");
+    ui->cameraViewComboBox->addItem("Left");
+    ui->cameraViewComboBox->addItem("Right");
+    ui->cameraViewComboBox->addItem("Front");
+    ui->cameraViewComboBox->addItem("Back");
+    ui->cameraViewComboBox->addItem("User Defined");
+
+}
+
+MyMainWindow::~MyMainWindow()
+{
+    delete ui;
+}
+
+void MyMainWindow::on_actionQuit_triggered()
+{
+    close();
+}
+
+void MyMainWindow::updateListSlot() {
+//    ui->faceList->clear();
+    for (int i = 0; i < ui->glwidget->mesh->faceCount(); i++) {
+        ui->faceList->addItem(ui->glwidget->mesh->faceAt(i));
+    }
+    std::set<Vertex*> vertices;
+    for (int i = 0; i < ui->glwidget->mesh->faceCount(); i++) {
+        HalfEdge * he0 = ui->glwidget->mesh->faceAt(i)->getHE();
+        HalfEdge * curr = he0->next;
+        int vertCount = 1;
+        while (curr != he0) {
+            vertCount++;
+            curr = curr->next;
+        }
+
+        curr = he0;
+        for (int j = 0; j < vertCount; j++) {
+            vertices.insert(curr->vert);
+            ui->edgesList->addItem(curr);
+            curr = curr->next;
+        }
+    }
+
+    std::set<Vertex*>::iterator it;
+    for (it=vertices.begin(); it!=vertices.end(); ++it) {
+         ui->vertexList->addItem(*it);
+    }
+
+
+    // make ray-selected face the current face in list widget
+    QItemSelectionModel *smf = ui->faceList->selectionModel();
+    smf->clearSelection();
+    for (int i = 0; i < ui->glwidget->mesh->faceCount(); i ++) {
+        if (ui->glwidget->mesh->faceAt(i)->active == true) {
+            ui->faceList->setCurrentItem(static_cast<QListWidgetItem *>(ui->glwidget->mesh->faceAt(i)));
+            break;
+        }
+    }
+
+    // make mouse-selected vertex the current vertex in list widget
+    QItemSelectionModel *smv = ui->vertexList->selectionModel();
+    smv->clearSelection();
+
+    std::set<Vertex*>::iterator it2;
+    for (it2=vertices.begin(); it2!=vertices.end(); ++it2) {
+        if (*it2->active == true) {
+            ui->faceList->setCurrentItem(static_cast<QListWidgetItem *>(*it2));
+            break;
+        }
+    }
+
+}
+
+void MyMainWindow::on_faceList_currentItemChanged(QListWidgetItem *current, QListWidgetItem *previous)
+{
+    if (current && previous) {
+        Face * currF = static_cast<Face*>(current);
+        Face * prevF = static_cast<Face*>(previous);
+        currF->active = true;
+        prevF->active = false;
+    } else if (current) {
+        Face * currF = static_cast<Face*>(current);
+        currF->active = true;
+    }
+    ui->glwidget->redrawMesh();
+}
+
+void MyMainWindow::on_vertexList_currentItemChanged(QListWidgetItem *current, QListWidgetItem *previous)
+{
+    if (current && previous) {
+        Vertex * currV = static_cast<Vertex*>(current);
+        Vertex * prevV = static_cast<Vertex*>(previous);
+        prevV->active = false;
+        currV->active = true;
+    } else if (current) {
+        Vertex * currV = static_cast<Vertex*>(current);
+        currV->active = true;
+    }
+    ui->glwidget->redrawMesh();
+}
+
+
+void MyMainWindow::on_pushButton_clicked() {}
+
+
+// ------------------- MESH OPERATION BUTTONS --------------------------------
+
+void MyMainWindow::clearLists() {
+
+//    ui->faceList->clear();
+//    ui->edgesList->clear();
+//    ui->vertexList->clear();
+}
+
+void MyMainWindow::on_triangulate_clicked()
+{
+    if (ui->faceList->selectedItems().count() != 0) {
+        Face * f = static_cast<Face *>(ui->faceList->selectedItems()[0]);
+        ui->glwidget->mesh->triangulate(f);
+        clearLists();
+        ui->glwidget->redrawMesh();
+    }
+}
+
+void MyMainWindow::on_addEdgeButton_clicked()
+{
+    if (ui->faceList->selectedItems().count() != 2) {
+        std::cout << "Select two faces and a vertex to add an edge." << std::endl;
+    }
+    if (ui->faceList->selectedItems().count() == 2 && ui->vertexList->selectedItems().count() != 0) {
+        Face * f = static_cast<Face *>(ui->faceList->selectedItems()[0]);
+        Face * f2 = static_cast<Face *>(ui->faceList->selectedItems()[1]);
+        Vertex * v = static_cast<Vertex *>(ui->vertexList->selectedItems()[0]);
+        ui->glwidget->mesh->addEdge(f, f2, v);
+        clearLists();
+        ui->glwidget->redrawMesh();
+    }
+}
+
+void MyMainWindow::on_addVertexButton_clicked()
+{
+    if (ui->edgesList->selectedItems().count() != 0) {
+        HalfEdge * he = static_cast<HalfEdge *>(ui->edgesList->selectedItems()[0]);
+        ui->glwidget->mesh->addVertex(he);
+        clearLists();
+        ui->glwidget->redrawMesh();
+    }
+}
+
+void MyMainWindow::on_deleteVertexButton_clicked()
+{
+//    if (ui->glwidget->mesh->faceCount() >= 1 && ui->vertexList->selectedItems().count() != 0) {
+//        Vertex * clicked_v = static_cast<Vertex *>(ui->vertexList->selectedItems()[0]);
+//        for (int i = 0; i < ui->glwidget->mesh->faceCount(); i++) {
+//            HalfEdge *loop = ui->glwidget->mesh->faceAt(i)->getHE();
+//            do {
+//                loop = loop->next;
+//                if (loop->vert->id == clicked_v->id) {
+//                    ui->glwidget->mesh->deleteVertex(loop);
+//                    break;
+//                }
+//            } while (loop != ui->glwidget->mesh->faceAt(i)->getHE());
+
+//        }
+//    }
+
+    if (ui->vertexList->selectedItems().count() != 0) {
+        Vertex * v = static_cast<Vertex *>(ui->vertexList->selectedItems()[0]);
+        HalfEdge* curr;
+        for (int i = 0; i < ui->glwidget->mesh->faceCount(); i++) {
+            HalfEdge* he0 = ui->glwidget->mesh->faceAt(i)->getHE();
+            curr = he0;
+            if (curr->vert == v) break;
+            curr = curr->next;
+            while (curr != he0) {
+                if (curr->vert == v) break;
+                curr = curr->next;
+            }
+        }
+        ui->glwidget->mesh->deleteVertex(curr);
+        clearLists();
+        ui->glwidget->redrawMesh();
+    }
+}
+
+
+void MyMainWindow::on_subdivideButton_clicked()
+{
+    ui->glwidget->mesh->subdivide();
+}
+
+void MyMainWindow::on_planeButton_clicked()
+{
+    ui->glwidget->mesh->plane();
+}
+
+
+// ------------------- MOVE VERTEX BUTTONS ------------------------------------
+
+void MyMainWindow::on_moveVertexX_valueChanged(double new_x)
+{
+    if (ui->vertexList->selectedItems().count() != 0) {
+        Vertex * v = static_cast<Vertex *>(ui->vertexList->selectedItems()[0]);
+        v->setPosVec(glm::vec3(new_x, v->getY(), v->getZ()));
+        ui->glwidget->redrawMesh();
+    }
+}
+
+void MyMainWindow::on_moveVertexY_valueChanged(double new_y)
+{
+    if (ui->vertexList->selectedItems().count() != 0) {
+        Vertex * v = static_cast<Vertex *>(ui->vertexList->selectedItems()[0]);
+        v->setPosVec(glm::vec3(v->getX(), new_y, v->getZ()));
+        ui->glwidget->redrawMesh();
+    }
+}
+
+void MyMainWindow::on_moveVertexZ_valueChanged(double new_z)
+{
+    if (ui->vertexList->selectedItems().count() != 0) {
+        Vertex * v = static_cast<Vertex *>(ui->vertexList->selectedItems()[0]);
+        v->setPosVec(glm::vec3(v->getX(), v->getY(), new_z));
+        ui->glwidget->redrawMesh();
+    }
+}
+
+// ------------------- FACE COLOR BUTTONS -------------------------------------
+
+void MyMainWindow::on_faceColorRed_valueChanged(double new_r)
+{
+    if (ui->faceList->selectedItems().count() != 0) {
+        Face * f = static_cast<Face *>(ui->faceList->selectedItems()[0]);
+        f->setColorVec(glm::vec3(new_r, f->getColorVec()[1], f->getColorVec()[2]));
+        ui->glwidget->redrawMesh();
+    }
+}
+
+void MyMainWindow::on_faceColorGreen_valueChanged(double new_g)
+{
+    if (ui->faceList->selectedItems().count() != 0) {
+        Face * f = static_cast<Face *>(ui->faceList->selectedItems()[0]);
+        f->setColorVec(glm::vec3(f->getColorVec()[0], new_g, f->getColorVec()[2]));
+        ui->glwidget->redrawMesh();
+    }
+}
+
+void MyMainWindow::on_faceColorBlue_valueChanged(double new_b)
+{
+    if (ui->faceList->selectedItems().count() != 0) {
+        Face * f = static_cast<Face *>(ui->faceList->selectedItems()[0]);
+        f->setColorVec(glm::vec3(f->getColorVec()[0], f->getColorVec()[1], new_b));
+        ui->glwidget->redrawMesh();
+        updateListSlot();
+    }
+}
+
+
+// ----------------------- CAMERA CONTROLS -------------------------------------
+
+
+void MyMainWindow::on_cameraViewComboBox_activated(const QString &arg1)
+{
+    if (arg1 == "Front")
+        ui->glwidget->cam->changeViewTo(ui->glwidget->cam->FRONT);
+    else if (arg1 == "Back")
+        ui->glwidget->cam->changeViewTo(ui->glwidget->cam->BACK);
+    else if (arg1 == "Right")
+        ui->glwidget->cam->changeViewTo(ui->glwidget->cam->RIGHT);
+    else if (arg1 == "Left")
+        ui->glwidget->cam->changeViewTo(ui->glwidget->cam->LEFT);
+    else if (arg1 == "Top")
+        ui->glwidget->cam->changeViewTo(ui->glwidget->cam->TOP);
+    else if (arg1 == "Bottom")
+        ui->glwidget->cam->changeViewTo(ui->glwidget->cam->BOTTOM);
+    else if (arg1 == "Perspective")
+        ui->glwidget->cam->changeViewTo(ui->glwidget->cam->PERSP);
+
+}
+

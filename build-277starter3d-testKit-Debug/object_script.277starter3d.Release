@@ -1,0 +1,16 @@
+INPUT(
+./release\main.o
+./release\myglwidget.o
+./release\mymainwindow.o
+./release\glcamera.o
+./release\vertex.o
+./release\face.o
+./release\halfedge.o
+./release\mesh.o
+./release\nearlyequal.o
+./release\grid.o
+./release\deformer.o
+./release\qrc_shaders.o
+./release\moc_myglwidget.o
+./release\moc_mymainwindow.o
+);
